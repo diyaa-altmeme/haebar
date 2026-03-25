@@ -62,13 +62,11 @@ export async function verifyRefreshToken(token: string) {
 
 export async function setSessionCookies(input: { accessToken: string; refreshToken: string }) {
   const cookieStore = await cookies();
-  // In AI Studio preview (iframe), we need SameSite=None and Secure=true
-  // Even in development, the preview is served over HTTPS
-  const secure = true;
+  const secure = process.env.NODE_ENV === "production";
 
   cookieStore.set(ACCESS_COOKIE, input.accessToken, {
     httpOnly: true,
-    sameSite: "none",
+    sameSite: secure ? "none" : "lax",
     secure,
     path: "/",
     maxAge: 60 * 60 * 24 * 7
@@ -76,7 +74,7 @@ export async function setSessionCookies(input: { accessToken: string; refreshTok
 
   cookieStore.set(REFRESH_COOKIE, input.refreshToken, {
     httpOnly: true,
-    sameSite: "none",
+    sameSite: secure ? "none" : "lax",
     secure,
     path: "/",
     maxAge: 60 * 60 * 24 * 30

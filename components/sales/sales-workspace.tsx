@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useDeferredValue, useEffect, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   CalendarDays,
@@ -105,13 +105,16 @@ const ELECTRONIC_METHODS = [
 ] as const;
 
 function createElectronicItems(values: Record<"master" | "swish" | "sagi" | "otherElec", string>) {
-  const items = ELECTRONIC_METHODS.filter((method) => Number(values[method.value] || "0") !== 0).map((method) => ({
+  const items = ELECTRONIC_METHODS.filter((method) => {
+    const amount = values[method.value] || "";
+    return amount !== "" && Number(amount) !== 0;
+  }).map((method) => ({
     method: method.value,
-    amount: normalizeMoney(values[method.value] || "0")
+    amount: values[method.value] || ""
   }));
 
   if (items.length === 0) {
-    return [{ method: "master", amount: "0.000" }];
+    return [{ method: "master", amount: "" }];
   }
 
   return items;
@@ -133,6 +136,15 @@ function electronicItemsToRecord(items: Array<{ method: string; amount: string }
   return mutated;
 }
 
+function sumElectronicItems(items: Array<{ method: string; amount: string }>) {
+  const total = items.reduce(
+    (acc, item) => addMoney(acc, item.amount ? normalizeMoney(item.amount) : "0.000"),
+    addMoney("0")
+  );
+
+  return normalizeMoney(total);
+}
+
 function createEmptyForm(): SaleFormState {
   const now = new Date();
 
@@ -142,20 +154,20 @@ function createEmptyForm(): SaleFormState {
     shift: "morning",
     saleDate: now.toISOString().slice(0, 10),
     entryTime: now.toTimeString().slice(0, 5),
-    cashSystem: "0.000",
-    returns: "0.000",
-    cashActual: "0.000",
+    cashSystem: "",
+    returns: "",
+    cashActual: "",
     systemElectronic: {
-      master: "0.000",
-      swish: "0.000",
-      sagi: "0.000",
-      otherElec: "0.000"
+      master: "",
+      swish: "",
+      sagi: "",
+      otherElec: ""
     },
     actualElectronic: {
-      master: "0.000",
-      swish: "0.000",
-      sagi: "0.000",
-      otherElec: "0.000"
+      master: "",
+      swish: "",
+      sagi: "",
+      otherElec: ""
     },
     systemElectronicItems: createElectronicItems({ master: "0.000", swish: "0.000", sagi: "0.000", otherElec: "0.000" }),
     actualElectronicItems: createElectronicItems({ master: "0.000", swish: "0.000", sagi: "0.000", otherElec: "0.000" }),
@@ -177,6 +189,31 @@ export function SalesWorkspace() {
   const [form, setForm] = useState<SaleFormState>(createEmptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const systemElectronicTotal = useMemo(() => sumElectronicItems(form.systemElectronicItems), [form.systemElectronicItems]);
+  const actualElectronicTotal = useMemo(() => sumElectronicItems(form.actualElectronicItems), [form.actualElectronicItems]);
+  const cashBreakdownTotal = useMemo(() => {
+    const total = form.cashBreakdown.reduce((acc, row) => {
+      const sub = Number(row.count || "0") * row.denomination;
+      return addMoney(acc, normalizeMoney(String(sub)));
+    }, addMoney("0"));
+    return normalizeMoney(total);
+  }, [form.cashBreakdown]);
+
+  const netCashSystem = useMemo(() => {
+    return normalizeMoney(addMoney(form.cashSystem || "0", `-${form.returns || "0"}`));
+  }, [form.cashSystem, form.returns]);
+
+  const totalActual = useMemo(() => {
+    const cash = addMoney(form.cashActual || "0");
+    const elect = addMoney(actualElectronicTotal);
+    return normalizeMoney(addMoney(cash, elect));
+  }, [form.cashActual, actualElectronicTotal]);
+
+  const totalNetSystem = useMemo(() => {
+    const elect = addMoney(systemElectronicTotal);
+    return normalizeMoney(addMoney(netCashSystem, elect));
+  }, [netCashSystem, systemElectronicTotal]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -367,7 +404,7 @@ export function SalesWorkspace() {
   };
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-3 font-semibold">
       <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="overflow-hidden">
           <CardHeader className="border-b border-slate/10">
@@ -458,7 +495,7 @@ export function SalesWorkspace() {
       <Dialog open={dialogOpen} onOpenChange={(open) => (!open ? resetForm() : setDialogOpen(true))}>
         <DialogContent className="max-w-6xl max-h-[94vh] overflow-y-auto bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,242,234,0.96))] px-0 pb-0 pt-0">
           <DialogHeader>
-            <div className="border-b border-slate/10 px-4 py-2.5">
+            <div className="px-4 py-2.5">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <DialogTitle className="text-lg">{form.id ? "تعديل مبيعات شفت" : "إدخال مبيعات شفت جديد"}</DialogTitle>
@@ -623,6 +660,10 @@ export function SalesWorkspace() {
               title="مبيعات النظام (كاش + إلكتروني)"
               description="أرقام النظام للمقارنة مع الجرد."
             >
+              <div className="grid gap-2 sm:grid-cols-2">
+                <InfoStrip label="إجمالي إلكتروني النظام" value={`${systemElectronicTotal} IQD`} tone="neutral" />
+                <InfoStrip label="صافى الكاش النظام" value={`${netCashSystem} IQD`} tone="neutral" />
+              </div>
               <div className="grid gap-2 xl:grid-cols-[0.95fr_1.05fr]">
                 <div className="space-y-2">
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -664,6 +705,11 @@ export function SalesWorkspace() {
               title="الخلاصة والفروقات"
               description="تُحسب من الخادم بعد الحفظ."
             >
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <InfoStrip label="الإجمالي الفعلي" value={`${totalActual} IQD`} tone="success" />
+                <InfoStrip label="الإجمالي النظام" value={`${totalNetSystem} IQD`} tone="success" />
+                <InfoStrip label="جملة فئات النقد" value={`${cashBreakdownTotal} IQD`} tone="neutral" />
+              </div>
               <div className="grid gap-2 lg:grid-cols-3">
                 <SummaryTile title="فارق الكاش" value="قيد الحساب" caption="يحسب في الخلفية" />
                 <SummaryTile title="فارق الإلكتروني" value="قيد الحساب" caption="يحسب في الخلفية" />
@@ -722,7 +768,7 @@ function MoneyField({
   return (
     <div>
       <label className="mb-0.5 block text-xs font-medium text-slate">{label}</label>
-      <Input className={`${accentClass} h-8 px-2.5 text-xs`} inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input className={`${accentClass} h-8 px-2.5 text-xs`} inputMode="decimal" placeholder="0.000" value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
   );
 }
@@ -771,6 +817,7 @@ function ElectronicBlock({
             <Input
               className="h-8 px-2.5 text-xs"
               inputMode="decimal"
+              placeholder="0.000"
               value={item.amount}
               onChange={(event) => onChange(index, "amount", event.target.value)}
             />
@@ -806,10 +853,9 @@ function SectionShell({
 }) {
   return (
     <section className="rounded-lg border border-slate/10 bg-white/80 shadow-xs">
-      <div className="flex items-start justify-between gap-2 border-b border-slate/10 px-3 py-2">
+      <div className="flex items-start justify-between gap-2 px-3 py-2">
         <div>
           <h3 className="text-sm font-semibold text-ink">{title}</h3>
-          <p className="mt-0.5 text-[11px] text-slate">{description}</p>
         </div>
         <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-700">{icon}</div>
       </div>
