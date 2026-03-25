@@ -1,11 +1,71 @@
-<div align="center">
+# Haebar Finance OS
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+منصة مالية احترافية مبنية بالكامل على:
 
-  <h1>Built with AI Studio</h2>
+- `Next.js App Router`
+- `TypeScript`
+- `Tailwind CSS`
+- `shadcn/ui`
+- `Framer Motion`
+- `PostgreSQL / Supabase`
+- `Prisma`
+- `Zod`
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## القواعد المالية المعتمدة
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+- جميع الحسابات المالية تنفذ في الخلفية فقط.
+- جميع القيم المالية محفوظة بدقة `NUMERIC(18,3)`.
+- لا يوجد اعتماد على `float`.
+- العمليات المالية الحرجة تعمل داخل `Database Transactions`.
+- يوجد `Audit Log` لكل العمليات.
+- يوجد `Recalculation` للقاصات.
+- يوجد `RTL` كامل في الواجهة.
 
-</div>
+## هيكل المشروع
+
+- `app/` صفحات Next.js وAPI Routes
+- `components/` الواجهة وعناصر UI
+- `lib/services/` منطق الأعمال
+- `lib/calculations/` الحسابات المالية
+- `lib/db/` الاتصال بقاعدة البيانات
+- `lib/cache/` الكاش وRedis
+- `prisma/` المخطط والـ seed والـ migrations
+
+## التشغيل المحلي
+
+1. انسخ `.env.example` إلى `.env`
+2. ضع:
+   - `DATABASE_URL`
+   - `AUTH_ACCESS_SECRET`
+   - `AUTH_REFRESH_SECRET`
+   - `REDIS_URL` اختيارياً
+3. شغل:
+
+```bash
+npm install
+npm run prisma:generate
+npm run prisma:migrate:deploy
+npm run prisma:seed
+npm run dev
+```
+
+## ملاحظات قاعدة البيانات
+
+- المشروع مربوط فعلياً على `Supabase PostgreSQL`.
+- تم اعتماد `Prisma migrations` في `prisma/migrations/`.
+- إذا احتجت مزامنة سريعة في بيئة تطوير فارغة يمكن استخدام:
+
+```bash
+npm run prisma:push
+```
+
+## بيانات الدخول الافتراضية
+
+- البريد: `admin@haebar.local`
+- كلمة المرور: `Admin12345!`
+
+## الحالة الحالية
+
+- لا توجد بنية `frontend/` و`backend/` منفصلة بعد الآن.
+- المشروع يعمل كبنية واحدة على Next.js.
+- البناء النهائي ينجح عبر `npm run build`.
