@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   Trash2,
   UserRound,
-  Wallet
+  Wallet,
+  ChevronDown
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { addMoney, normalizeMoney } from "@/lib/calculations/money";
 import { denominationOptions } from "@/lib/calculations/sales";
 
 type Employee = {
@@ -80,6 +82,8 @@ type SaleFormState = {
   cashActual: string;
   systemElectronic: Record<"master" | "swish" | "sagi" | "otherElec", string>;
   actualElectronic: Record<"master" | "swish" | "sagi" | "otherElec", string>;
+  systemElectronicItems: Array<{ method: "master" | "swish" | "sagi" | "otherElec" | "other"; amount: string }>;
+  actualElectronicItems: Array<{ method: "master" | "swish" | "sagi" | "otherElec" | "other"; amount: string }>;
   cashBreakdown: Array<{
     denomination: number;
     count: string;
@@ -92,6 +96,42 @@ const shiftLabels = {
   evening: "مسائي",
   night: "ليلي"
 } as const;
+
+const ELECTRONIC_METHODS = [
+  { value: "master", label: "Master" },
+  { value: "swish", label: "Swish" },
+  { value: "sagi", label: "Sagi" },
+  { value: "otherElec", label: "Other" }
+] as const;
+
+function createElectronicItems(values: Record<"master" | "swish" | "sagi" | "otherElec", string>) {
+  const items = ELECTRONIC_METHODS.filter((method) => Number(values[method.value] || "0") !== 0).map((method) => ({
+    method: method.value,
+    amount: normalizeMoney(values[method.value] || "0")
+  }));
+
+  if (items.length === 0) {
+    return [{ method: "master", amount: "0.000" }];
+  }
+
+  return items;
+}
+
+function electronicItemsToRecord(items: Array<{ method: string; amount: string }>) {
+  const initial = { master: "0.000", swish: "0.000", sagi: "0.000", otherElec: "0.000" };
+  const mutated = { ...initial };
+
+  for (const item of items) {
+    const amount = item.amount ? normalizeMoney(item.amount) : "0.000";
+    if (item.method === "master" || item.method === "swish" || item.method === "sagi" || item.method === "otherElec") {
+      mutated[item.method] = normalizeMoney(addMoney(mutated[item.method], amount));
+    } else {
+      mutated.otherElec = normalizeMoney(addMoney(mutated.otherElec, amount));
+    }
+  }
+
+  return mutated;
+}
 
 function createEmptyForm(): SaleFormState {
   const now = new Date();
@@ -117,6 +157,8 @@ function createEmptyForm(): SaleFormState {
       sagi: "0.000",
       otherElec: "0.000"
     },
+    systemElectronicItems: createElectronicItems({ master: "0.000", swish: "0.000", sagi: "0.000", otherElec: "0.000" }),
+    actualElectronicItems: createElectronicItems({ master: "0.000", swish: "0.000", sagi: "0.000", otherElec: "0.000" }),
     cashBreakdown: denominationOptions.map((denomination) => ({
       denomination,
       count: "0"
@@ -138,6 +180,7 @@ export function SalesWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [denominationsModalOpen, setDenominationsModalOpen] = useState(false);
 
   const loadEmployees = async () => {
     const response = await fetch("/api/employees", { cache: "no-store" });
@@ -226,12 +269,25 @@ export function SalesWorkspace() {
         sagi: sale.sagiActual,
         otherElec: sale.otherElecActual
       },
+      systemElectronicItems: createElectronicItems({
+        master: sale.masterSystem,
+        swish: sale.swishSystem,
+        sagi: sale.sagiSystem,
+        otherElec: sale.otherElecSystem
+      }),
+      actualElectronicItems: createElectronicItems({
+        master: sale.masterActual,
+        swish: sale.swishActual,
+        sagi: sale.sagiActual,
+        otherElec: sale.otherElecActual
+      }),
       cashBreakdown: denominationOptions.map((denomination) => ({
         denomination,
         count: String(breakdownMap.get(denomination) ?? 0)
       })),
       notes: sale.notes ?? ""
     });
+    setDenominationsModalOpen(false);
     setDialogOpen(true);
   };
 
@@ -259,6 +315,7 @@ export function SalesWorkspace() {
 
   const resetForm = (closeDialog = true) => {
     setForm(createEmptyForm());
+    setDenominationsModalOpen(false);
     if (closeDialog) {
       setDialogOpen(false);
     }
@@ -279,8 +336,8 @@ export function SalesWorkspace() {
       cashSystem: form.cashSystem,
       returns: form.returns,
       cashActual: form.cashActual,
-      systemElectronic: form.systemElectronic,
-      actualElectronic: form.actualElectronic,
+      systemElectronic: electronicItemsToRecord(form.systemElectronicItems),
+      actualElectronic: electronicItemsToRecord(form.actualElectronicItems),
       cashBreakdown: form.cashBreakdown.map((row) => ({
         denomination: row.denomination,
         count: Number(row.count || "0")
@@ -401,32 +458,32 @@ export function SalesWorkspace() {
       <Dialog open={dialogOpen} onOpenChange={(open) => (!open ? resetForm() : setDialogOpen(true))}>
         <DialogContent className="max-w-6xl max-h-[94vh] overflow-y-auto bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,242,234,0.96))] px-0 pb-0 pt-0">
           <DialogHeader>
-            <div className="border-b border-slate/10 px-6 py-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="border-b border-slate/10 px-4 py-2.5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <DialogTitle className="text-xl">{form.id ? "تعديل مبيعات شفت" : "إدخال مبيعات شفت جديد"}</DialogTitle>
-                  <DialogDescription className="mt-1">
-                    التصميم هنا مهيأ للإدخال السريع، بينما الحسابات النهائية والفروقات تنفذ في الخلفية فقط.
+                  <DialogTitle className="text-lg">{form.id ? "تعديل مبيعات شفت" : "إدخال مبيعات شفت جديد"}</DialogTitle>
+                  <DialogDescription className="mt-0.5 text-[12px]">
+                    التصميم مهيأ للإدخال السريع، الحسابات تنفذ في الخلفية.
                   </DialogDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => resetForm(false)}>
-                  <RotateCcw className="ml-1 h-3.5 w-3.5" />
-                  إعادة تعيين
+                <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => resetForm(false)}>
+                  <RotateCcw className="ml-1 h-3 w-3" />
+                  إعادة
                 </Button>
               </div>
             </div>
           </DialogHeader>
 
-          <form className="space-y-4 px-4 py-4" onSubmit={handleSubmit}>
+          <form className="space-y-2 px-3 py-2.5" onSubmit={handleSubmit}>
             <SectionShell
-              icon={<UserRound className="h-4 w-4" />}
+              icon={<UserRound className="h-3 w-3" />}
               title="بيانات الشفت الأساسية"
-              description="حدد الموظف، الشفت، والتاريخ والوقت قبل إدخال الأرقام."
+              description="حدد الموظف، الشفت، والتاريخ والوقت."
             >
-              <div className="grid gap-3 lg:grid-cols-[1.35fr_0.8fr_0.9fr_1fr_0.9fr]">
+              <div className="grid gap-2 lg:grid-cols-[1.35fr_0.8fr_0.9fr_1fr_0.9fr]">
                 <Field label="الموظف (كاشير) *">
                   <select
-                    className="flex h-11 w-full rounded-2xl border border-slate/15 bg-white px-4 text-sm text-ink shadow-sm outline-none transition focus:border-olive/40 focus:ring-2 focus:ring-olive/10"
+                    className="flex h-9 w-full rounded-xl border border-slate/15 bg-white px-3 text-xs text-ink shadow-sm outline-none transition focus:border-olive/40 focus:ring-1 focus:ring-olive/10"
                     value={form.employeeId}
                     onChange={(event) => handleEmployeeChange(event.target.value)}
                   >
@@ -440,7 +497,7 @@ export function SalesWorkspace() {
                 </Field>
                 <Field label="الشفت *">
                   <select
-                    className="flex h-11 w-full rounded-2xl border border-slate/15 bg-white px-4 text-sm text-ink shadow-sm outline-none transition focus:border-olive/40 focus:ring-2 focus:ring-olive/10"
+                    className="flex h-9 w-full rounded-xl border border-slate/15 bg-white px-3 text-xs text-ink shadow-sm outline-none transition focus:border-olive/40 focus:ring-1 focus:ring-olive/10"
                     value={form.shift}
                     onChange={(event) => setForm((current) => ({ ...current, shift: event.target.value as SaleFormState["shift"] }))}
                   >
@@ -452,19 +509,19 @@ export function SalesWorkspace() {
                   </select>
                 </Field>
                 <Field label="رقم الكاشير">
-                  <Input value={form.cashierNumber} readOnly className="bg-sky-50/80" />
+                  <Input value={form.cashierNumber} readOnly className="bg-sky-50/80 h-9 text-xs" />
                 </Field>
                 <Field label="التاريخ والوقت *">
-                  <div className="grid grid-cols-[1fr_120px] gap-2">
-                    <Input type="date" value={form.saleDate} onChange={(event) => setForm((current) => ({ ...current, saleDate: event.target.value }))} />
-                    <Input type="time" value={form.entryTime} onChange={(event) => setForm((current) => ({ ...current, entryTime: event.target.value }))} />
+                  <div className="grid grid-cols-[1fr_100px] gap-1.5">
+                    <Input type="date" value={form.saleDate} onChange={(event) => setForm((current) => ({ ...current, saleDate: event.target.value }))} className="h-9 text-xs" />
+                    <Input type="time" value={form.entryTime} onChange={(event) => setForm((current) => ({ ...current, entryTime: event.target.value }))} className="h-9 text-xs" />
                   </div>
                 </Field>
                 <div className="flex items-end">
-                  <div className="surface-muted flex w-full items-center gap-2 px-4 py-3 text-sm text-slate">
-                    <CalendarDays className="h-4 w-4 text-olive" />
+                  <div className="surface-muted flex w-full items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate">
+                    <CalendarDays className="h-3 w-3 text-olive" />
                     <span>{form.saleDate || "—"}</span>
-                    <Clock3 className="mr-auto h-4 w-4 text-olive" />
+                    <Clock3 className="mr-auto h-3 w-3 text-olive" />
                     <span>{form.entryTime || "—"}</span>
                   </div>
                 </div>
@@ -472,95 +529,142 @@ export function SalesWorkspace() {
             </SectionShell>
 
             <SectionShell
-              icon={<Wallet className="h-4 w-4" />}
+              icon={<Wallet className="h-3 w-3" />}
               title="الجرد الفعلي في القاصة (كاش + إلكتروني)"
-              description="أدخل ما تم جرده فعلياً. الخادم سيعتمد هذه القيم في الحساب النهائي."
+              description="أدخل ما تم جرده فعلياً."
             >
-              <div className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <MoneyField label="إجمالي الكاش الفعلي (الجرد)" value={form.cashActual} onChange={(value) => setForm((current) => ({ ...current, cashActual: value }))} accent="emerald" />
-                    <InfoStrip label="مجموع الجرد الفعلي" value="يُحسب في الخادم عند الحفظ" tone="success" />
+              <div className="grid gap-2 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="space-y-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <MoneyField label="الكاش الفعلي" value={form.cashActual} onChange={(value) => setForm((current) => ({ ...current, cashActual: value }))} accent="emerald" />
+                    <InfoStrip label="المجموع" value="يُحسب في الخادم" tone="success" />
                   </div>
 
-                  <div>
-                    <div className="mb-3 flex items-center justify-between">
-                      <label className="field-label mb-0">مبالغ الفئات النقدية (الجرد)</label>
-                      <Badge variant="warning">مرجع أعلى للكاش الفعلي</Badge>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {form.cashBreakdown.map((row, index) => (
-                        <div key={row.denomination} className="rounded-2xl border border-slate/10 bg-white px-3 py-2 shadow-sm">
-                          <div className="mb-1 flex items-center justify-between">
-                            <div className="text-xs font-semibold text-ink">{row.denomination.toLocaleString("en-US")}</div>
-                            <div className="text-xs text-slate">IQD</div>
+                  <button
+                    type="button"
+                    onClick={() => setDenominationsModalOpen(true)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate/10 bg-sky-50/50 px-3 py-2 text-xs font-medium text-slate hover:bg-sky-50 transition"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Wallet className="h-3.5 w-3.5 text-sky-600" />
+                      تفاصيل الفئات النقدية
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-sky-600" />
+                  </button>
+
+                  <Dialog open={denominationsModalOpen} onOpenChange={setDenominationsModalOpen}>
+                    <DialogContent className="max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle>تفاصيل الفئات النقدية</DialogTitle>
+                        <DialogDescription>أدخل عدد القطع لكل فئة، ثم أغلق لتطبيقها.</DialogDescription>
+                      </DialogHeader>
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {form.cashBreakdown.map((row, index) => (
+                          <div key={row.denomination} className="rounded-lg border border-slate/10 bg-white p-2">
+                            <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-ink">
+                              <span>{row.denomination.toLocaleString("en-US")} IQD</span>
+                              <span className="text-slate">×</span>
+                            </div>
+                            <Input
+                              className="h-8 px-2 text-xs"
+                              inputMode="numeric"
+                              value={row.count}
+                              onChange={(event) =>
+                                setForm((current) => {
+                                  const next = [...current.cashBreakdown];
+                                  next[index] = { ...next[index], count: event.target.value };
+                                  return { ...current, cashBreakdown: next };
+                                })
+                              }
+                            />
                           </div>
-                          <Input
-                            className="h-9 px-3 text-xs"
-                            inputMode="numeric"
-                            value={row.count}
-                            onChange={(event) =>
-                              setForm((current) => {
-                                const next = [...current.cashBreakdown];
-                                next[index] = { ...next[index], count: event.target.value };
-                                return { ...current, cashBreakdown: next };
-                              })
-                            }
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                        ))}
+                      </div>
+
+                      <DialogFooter>
+                        <Button type="button" onClick={() => setDenominationsModalOpen(false)}>
+                          إغلاق
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
 
                 <ElectronicBlock
-                  title="مبالغ الفيزا الفعلية (الجرد)"
-                  subtitle="أدخل تفاصيل المبالغ الفعلية لكل قناة إلكترونية."
-                  values={form.actualElectronic}
-                  onChange={(key, value) =>
+                  title="الفيزا الفعلية (الجرد)"
+                  subtitle="أضف أكثر من إدخال إلكتروني واحد (مستر، سويش، ساجي أو أخرى)."
+                  items={form.actualElectronicItems}
+                  onChange={(index, field, value) =>
+                    setForm((current) => {
+                      const next = [...current.actualElectronicItems];
+                      next[index] = { ...next[index], [field]: value };
+                      return { ...current, actualElectronicItems: next };
+                    })
+                  }
+                  onAdd={() =>
                     setForm((current) => ({
                       ...current,
-                      actualElectronic: { ...current.actualElectronic, [key]: value }
+                      actualElectronicItems: [...current.actualElectronicItems, { method: "otherElec", amount: "0.000" }]
                     }))
+                  }
+                  onRemove={(index) =>
+                    setForm((current) => {
+                      const next = current.actualElectronicItems.filter((_, i) => i !== index);
+                      return { ...current, actualElectronicItems: next };
+                    })
                   }
                 />
               </div>
             </SectionShell>
 
             <SectionShell
-              icon={<MonitorSmartphone className="h-4 w-4" />}
+              icon={<MonitorSmartphone className="h-3 w-3" />}
               title="مبيعات النظام (كاش + إلكتروني)"
-              description="هذه هي أرقام النظام التي ستتم مقارنتها مع الجرد الفعلي."
+              description="أرقام النظام للمقارنة مع الجرد."
             >
-              <div className="grid gap-3 xl:grid-cols-[0.95fr_1.05fr]">
-                <div className="space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <MoneyField label="كاش المبيعات (نظام)" value={form.cashSystem} onChange={(value) => setForm((current) => ({ ...current, cashSystem: value }))} accent="amber" />
-                    <MoneyField label="المرتجعات (نظام)" value={form.returns} onChange={(value) => setForm((current) => ({ ...current, returns: value }))} accent="amber" />
+              <div className="grid gap-2 xl:grid-cols-[0.95fr_1.05fr]">
+                <div className="space-y-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <MoneyField label="الكاش (نظام)" value={form.cashSystem} onChange={(value) => setForm((current) => ({ ...current, cashSystem: value }))} accent="amber" />
+                    <MoneyField label="المرتجعات" value={form.returns} onChange={(value) => setForm((current) => ({ ...current, returns: value }))} accent="amber" />
                   </div>
-                  <InfoStrip label="إجمالي المطلوب من النظام (صافي)" value="يُحسب في الخادم عند الحفظ" tone="neutral" />
+                  <InfoStrip label="الصافي" value="يُحسب في الخادم" tone="neutral" />
                 </div>
 
                 <ElectronicBlock
-                  title="تفاصيل الفيزا (نظام)"
-                  subtitle="تفصيل القيم المسجلة في النظام قبل المقارنة."
-                  values={form.systemElectronic}
-                  onChange={(key, value) =>
+                  title="الفيزا (نظام)"
+                  subtitle="أضف أكثر من إدخال إلكتروني واحد من النظام."
+                  items={form.systemElectronicItems}
+                  onChange={(index, field, value) =>
+                    setForm((current) => {
+                      const next = [...current.systemElectronicItems];
+                      next[index] = { ...next[index], [field]: value };
+                      return { ...current, systemElectronicItems: next };
+                    })
+                  }
+                  onAdd={() =>
                     setForm((current) => ({
                       ...current,
-                      systemElectronic: { ...current.systemElectronic, [key]: value }
+                      systemElectronicItems: [...current.systemElectronicItems, { method: "otherElec", amount: "0.000" }]
                     }))
+                  }
+                  onRemove={(index) =>
+                    setForm((current) => {
+                      const next = current.systemElectronicItems.filter((_, i) => i !== index);
+                      return { ...current, systemElectronicItems: next };
+                    })
                   }
                 />
               </div>
             </SectionShell>
 
             <SectionShell
-              icon={<ShieldCheck className="h-4 w-4" />}
-              title="الخلاصة والفروقات النهائية"
-              description="الفروقات لا يتم حسابها هنا في الواجهة. تظهر من الخادم بعد الحفظ والمطابقة."
+              icon={<ShieldCheck className="h-3 w-3" />}
+              title="الخلاصة والفروقات"
+              description="تُحسب من الخادم بعد الحفظ."
             >
-              <div className="grid gap-3 lg:grid-cols-3">
+              <div className="grid gap-2 lg:grid-cols-3">
                 <SummaryTile title="فارق الكاش" value="قيد الحساب" caption="يحسب في الخلفية" />
                 <SummaryTile title="فارق الإلكتروني" value="قيد الحساب" caption="يحسب في الخلفية" />
                 <SummaryTile title="الفارق الإجمالي" value="قيد الحساب" caption="بعد المقارنة النهائية" />
@@ -568,25 +672,25 @@ export function SalesWorkspace() {
             </SectionShell>
 
             <SectionShell
-              icon={<ReceiptText className="h-4 w-4" />}
+              icon={<ReceiptText className="h-3 w-3" />}
               title="ملاحظات"
-              description="أي توضيح إضافي مرتبط بهذا الشفت أو بعملية الجرد."
+              description="توضيح إضافي مرتبط بالشفت."
             >
-              <Textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
+              <Textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className="min-h-16 text-xs" />
             </SectionShell>
 
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs leading-6 text-emerald-900">
-              الحفظ ينفذ Transaction مالية كاملة ثم يعيد حساب القاصات ويسجل العملية في Audit Log.
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] leading-5 text-emerald-900">
+              الحفظ ينفذ Transaction مالية كاملة ثم يعيد حساب القاصات.
             </div>
 
-            {error ? <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+            {error ? <div className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</div> : null}
 
-            <DialogFooter className="sticky bottom-0 border-t border-slate/10 bg-white/95 px-4 py-3 backdrop-blur">
-              <Button className="min-w-[190px] bg-emerald-600 hover:bg-emerald-700" type="submit" disabled={saving}>
-                {saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />}
-                {form.id ? "حفظ وترحيل التعديل" : "حفظ وترحيل المبالغ"}
+            <DialogFooter className="sticky bottom-0 border-t border-slate/10 bg-white/95 px-3 py-2 backdrop-blur gap-2">
+              <Button className="bg-emerald-600 hover:bg-emerald-700 h-9 text-sm" type="submit" disabled={saving}>
+                {saving ? <Loader2 className="ml-1.5 h-3.5 w-3.5 animate-spin" /> : <Plus className="ml-1.5 h-3.5 w-3.5" />}
+                {form.id ? "تحديث" : "حفظ"}
               </Button>
-              <Button type="button" variant="outline" onClick={() => resetForm()}>
+              <Button type="button" variant="outline" onClick={() => resetForm()} className="h-9 text-sm">
                 إلغاء
               </Button>
             </DialogFooter>
@@ -617,8 +721,8 @@ function MoneyField({
 
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate">{label}</label>
-      <Input className={`${accentClass} h-10 px-3 text-xs`} inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} />
+      <label className="mb-0.5 block text-xs font-medium text-slate">{label}</label>
+      <Input className={`${accentClass} h-8 px-2.5 text-xs`} inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
   );
 }
@@ -626,30 +730,53 @@ function MoneyField({
 function ElectronicBlock({
   title,
   subtitle,
-  values,
-  onChange
+  items,
+  onChange,
+  onAdd,
+  onRemove
 }: {
   title: string;
   subtitle?: string;
-  values: Record<"master" | "swish" | "sagi" | "otherElec", string>;
-  onChange: (key: "master" | "swish" | "sagi" | "otherElec", value: string) => void;
+  items: Array<{ method: "master" | "swish" | "sagi" | "otherElec" | "other"; amount: string }>;
+  onChange: (index: number, field: "method" | "amount", value: string) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-slate/10 bg-white/80 p-3 shadow-sm">
-      <div className="mb-2">
-        <h3 className="text-xs font-semibold text-ink">{title}</h3>
-        {subtitle ? <p className="mt-0.5 text-[11px] text-slate">{subtitle}</p> : null}
+    <div className="rounded-lg border border-slate/10 bg-white/80 p-2 shadow-sm">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-xs font-semibold text-ink">{title}</h3>
+          {subtitle ? <p className="mt-0.5 text-[10px] text-slate">{subtitle}</p> : null}
+        </div>
+        <Button size="xs" variant="outline" type="button" onClick={onAdd}>
+          + إضافة مبلغ
+        </Button>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {([
-          ["master", "Master"],
-          ["swish", "Swish"],
-          ["sagi", "Sagi"],
-          ["otherElec", "Other"]
-        ] as const).map(([key, label]) => (
-          <div key={key}>
-            <label className="mb-1 block text-xs font-medium text-slate">{label}</label>
-            <Input className="h-10 px-3 text-xs" inputMode="decimal" value={values[key]} onChange={(event) => onChange(key, event.target.value)} />
+      <div className="space-y-1">
+        {items.map((item, index) => (
+          <div key={`${item.method}-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-1.5">
+            <select
+              className="h-8 rounded-lg border border-slate/20 bg-white px-2 text-xs"
+              value={item.method}
+              onChange={(event) => onChange(index, "method", event.target.value)}
+            >
+              {ELECTRONIC_METHODS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+              <option value="other">سوا</option>
+            </select>
+            <Input
+              className="h-8 px-2.5 text-xs"
+              inputMode="decimal"
+              value={item.amount}
+              onChange={(event) => onChange(index, "amount", event.target.value)}
+            />
+            <Button size="xs" variant="ghost" type="button" onClick={() => onRemove(index)}>
+              حذف
+            </Button>
           </div>
         ))}
       </div>
@@ -660,7 +787,7 @@ function ElectronicBlock({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate">{label}</label>
+      <label className="mb-0.5 block text-xs font-medium text-slate">{label}</label>
       {children}
     </div>
   );
@@ -678,15 +805,15 @@ function SectionShell({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate/10 bg-white/80 shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-slate/10 px-4 py-3">
+    <section className="rounded-lg border border-slate/10 bg-white/80 shadow-xs">
+      <div className="flex items-start justify-between gap-2 border-b border-slate/10 px-3 py-2">
         <div>
           <h3 className="text-sm font-semibold text-ink">{title}</h3>
-          <p className="mt-0.5 text-xs text-slate">{description}</p>
+          <p className="mt-0.5 text-[11px] text-slate">{description}</p>
         </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-50 text-sky-700">{icon}</div>
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-700">{icon}</div>
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-2.5">{children}</div>
     </section>
   );
 }
@@ -704,12 +831,12 @@ function InfoStrip({
     <div
       className={
         tone === "success"
-          ? "rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2"
-          : "rounded-xl border border-slate/10 bg-slate-50 px-3 py-2"
+          ? "rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5"
+          : "rounded-lg border border-slate/10 bg-slate-50 px-2.5 py-1.5"
       }
     >
       <div className="text-xs font-medium text-slate">{label}</div>
-      <div className="mt-1 text-xs font-semibold text-ink">{value}</div>
+      <div className="mt-0.5 text-xs font-semibold text-ink">{value}</div>
     </div>
   );
 }
@@ -724,11 +851,11 @@ function SummaryTile({
   caption: string;
 }) {
   return (
-    <div className="rounded-2xl border border-sky-100 bg-[linear-gradient(180deg,#f8fbff,#edf5ff)] px-3 py-4 text-center shadow-sm">
+    <div className="rounded-lg border border-sky-100 bg-[linear-gradient(180deg,#f8fbff,#edf5ff)] px-2.5 py-2.5 text-center shadow-xs">
       <div className="text-xs font-semibold text-ink">{title}</div>
-      <div className="mt-2 text-lg font-bold text-sky-700">{value}</div>
-      <div className="mt-2 inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-medium text-sky-700">مطابقة بعد الحفظ</div>
-      <div className="mt-1 text-[11px] text-slate">{caption}</div>
+      <div className="mt-1.5 text-base font-bold text-sky-700">{value}</div>
+      <div className="mt-1.5 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">بعد الحفظ</div>
+      <div className="mt-0.5 text-[10px] text-slate">{caption}</div>
     </div>
   );
 }

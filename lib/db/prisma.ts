@@ -14,14 +14,21 @@ if (connectionString.startsWith('"') && connectionString.endsWith('"')) {
   connectionString = connectionString.slice(1, -1);
 }
 
-// Remove sslmode=require from connection string to avoid overriding ssl config
-connectionString = connectionString.replace('?schema=public&sslmode=require', '?schema=public');
-connectionString = connectionString.replace('&sslmode=require', '');
-connectionString = connectionString.replace('?sslmode=require', '');
+// Support both local and remote (Supabase) connections
+const isSupabase = connectionString.includes('supabase.com');
+let sslConfig: any = { rejectUnauthorized: false };
+
+if (!isSupabase) {
+  // For local PostgreSQL, we can skip SSL
+  sslConfig = false;
+}
 
 const pool = new Pool({ 
   connectionString,
-  ssl: { rejectUnauthorized: false }
+  ssl: sslConfig,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000
 });
 const adapter = new PrismaPg(pool as any);
 
