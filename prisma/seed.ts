@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/db/prisma";
 
 if (!process.env.DATABASE_URL && existsSync(".env")) {
   const envFile = readFileSync(".env", "utf8");
@@ -27,7 +27,7 @@ if (!process.env.DATABASE_URL && existsSync(".env")) {
   }
 }
 
-const prisma = new PrismaClient();
+import { prisma } from "../lib/db/prisma";
 
 async function upsertEmployee(input: {
   name: string;
