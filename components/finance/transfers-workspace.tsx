@@ -152,7 +152,7 @@ export function TransfersWorkspace() {
               ) : (
                 transfers.map((transfer) => (
                   <tr key={transfer.id}>
-                    <td>{transfer.transferDate}</td>
+                    <td className="font-mono">{transfer.transferDate}</td>
                     <td>{boxLabels[transfer.fromBox]}</td>
                     <td>{boxLabels[transfer.toBox]}</td>
                     <td className="font-mono">{transfer.amount}</td>

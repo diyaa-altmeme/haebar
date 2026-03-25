@@ -48,7 +48,20 @@
   select,
   textarea,
   button {
-    font: inherit;
+    font-family: var(--font-numeric), var(--font-arabic), sans-serif;
+  }
+
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="week"],
+  input[inputmode="decimal"],
+  input[inputmode="numeric"],
+  .font-mono {
+    font-family: var(--font-numeric), monospace;
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -66,7 +79,9 @@
   }
 
   .metric-value {
-    @apply font-mono text-3xl font-semibold tracking-tight text-ink;
+    font-family: var(--font-numeric), monospace;
+    @apply text-3xl font-semibold tracking-tight text-ink;
+    font-variant-numeric: tabular-nums;
   }
 
   .field-label {

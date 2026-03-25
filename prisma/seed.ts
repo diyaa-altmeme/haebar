@@ -27,8 +27,6 @@ if (!process.env.DATABASE_URL && existsSync(".env")) {
   }
 }
 
-import { prisma } from "../lib/db/prisma";
-
 async function upsertEmployee(input: {
   name: string;
   cashierNumber: number;

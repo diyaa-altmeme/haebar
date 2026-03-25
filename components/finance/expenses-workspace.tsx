@@ -200,7 +200,7 @@ export function ExpensesWorkspace() {
               ) : (
                 expenses.map((expense) => (
                   <tr key={expense.id}>
-                    <td>{expense.expenseDate}</td>
+                    <td className="font-mono">{expense.expenseDate}</td>
                     <td>{expense.category}</td>
                     <td className="font-mono">{expense.amount}</td>
                     <td>{boxLabels[expense.paymentSource]}</td>

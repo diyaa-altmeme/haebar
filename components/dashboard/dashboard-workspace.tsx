@@ -174,9 +174,9 @@ export function DashboardWorkspace() {
               <CardContent className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.weeklySeries}>
-                    <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip />
+                    <XAxis dataKey="week" tick={{ fontSize: 12, fontFamily: "var(--font-numeric)" }} />
+                    <YAxis tick={{ fontSize: 12, fontFamily: "var(--font-numeric)" }} />
+                    <Tooltip contentStyle={{ fontFamily: "var(--font-numeric)" }} />
                     <Bar dataKey="totalNetSystem" fill="#2d5a46" radius={[8, 8, 0, 0]} />
                     <Bar dataKey="totalActual" fill="#c68b2f" radius={[8, 8, 0, 0]} />
                   </BarChart>
@@ -197,7 +197,7 @@ export function DashboardWorkspace() {
                         <Cell key={entry.name} fill={index === 0 ? "#2d5a46" : "#d96f4a"} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip contentStyle={{ fontFamily: "var(--font-numeric)" }} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -244,7 +244,7 @@ export function DashboardWorkspace() {
                   <div key={sale.id} className="surface-muted flex items-center justify-between px-4 py-3 text-sm">
                     <div>
                       <div className="font-medium text-ink">{sale.employeeName}</div>
-                      <div className="text-xs text-slate">
+                      <div className="text-xs text-slate font-mono">
                         {sale.saleDate} - كاشير #{sale.cashierNumber}
                       </div>
                     </div>
@@ -264,7 +264,7 @@ export function DashboardWorkspace() {
                   <div key={expense.id} className="surface-muted flex items-center justify-between px-4 py-3 text-sm">
                     <div>
                       <div className="font-medium text-ink">{expense.category}</div>
-                      <div className="text-xs text-slate">{expense.expenseDate}</div>
+                      <div className="text-xs text-slate font-mono">{expense.expenseDate}</div>
                     </div>
                     <div className="text-left">
                       <div className="font-mono text-ink">{expense.amount}</div>
@@ -288,7 +288,7 @@ export function DashboardWorkspace() {
                 <div key={box.id} className="surface-muted p-4">
                   <div className="text-sm font-semibold text-ink">{boxLabels[box.boxType] ?? box.boxType}</div>
                   <div className="mt-3 font-mono text-2xl text-ink">{box.calculatedBalance}</div>
-                  <div className="mt-1 text-xs text-slate">فرق الجرد: {box.difference ?? "غير مسجل"}</div>
+                  <div className="mt-1 text-xs text-slate font-mono">فرق الجرد: {box.difference ?? "غير مسجل"}</div>
                 </div>
               ))}
             </CardContent>

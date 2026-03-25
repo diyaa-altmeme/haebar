@@ -25,7 +25,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" className={`${arabic.variable} ${numeric.variable}`}>
+    <html lang="ar-u-nu-latn" dir="rtl" className={`${arabic.variable} ${numeric.variable}`}>
       <body className="font-[var(--font-arabic)]">
         <AppShell>{children}</AppShell>
       </body>

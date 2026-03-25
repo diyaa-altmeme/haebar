@@ -367,10 +367,10 @@ export function SalesWorkspace() {
                   ) : (
                     sales.map((sale) => (
                       <tr key={sale.id}>
-                        <td>{sale.saleDate}</td>
+                        <td className="font-mono">{sale.saleDate}</td>
                         <td>
                           <div className="font-medium">{sale.employeeName ?? "غير محدد"}</div>
-                          <div className="text-xs text-slate">كاشير #{sale.cashierNumber}</div>
+                          <div className="text-xs text-slate font-mono">كاشير #{sale.cashierNumber}</div>
                         </td>
                         <td>{shiftLabels[sale.shift as keyof typeof shiftLabels] ?? sale.shift}</td>
                         <td className="font-mono">{sale.totalNetSystem}</td>
